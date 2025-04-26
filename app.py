@@ -153,6 +153,11 @@ def train_model():
 
 model = train_model()
 
+
+@app.route('/')
+def index():
+    return "Welcome to the Water Quality Monitoring API!"
+
 # POST endpoint to receive sensor data
 @app.route('/api/sensor_data', methods=['POST'])
 def receive_sensor_data():
