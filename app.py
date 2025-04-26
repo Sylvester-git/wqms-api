@@ -154,7 +154,7 @@ def train_model():
 model = train_model()
 
 
-@app.route('/')
+@app.route('/', methods=['GET'])
 def index():
     return "Welcome to the Water Quality Monitoring API!"
 
