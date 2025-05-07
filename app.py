@@ -47,7 +47,10 @@ def get_mongo_client():
 # Initialize MongoDB
 mongo_client = get_mongo_client()
 db = mongo_client['water_quality_db']
-collection = db['sensor_data']
+sensor_data_collection = db['sensor_data']
+user_data_collection = db['users']
+alert_collection = db['alerts']
+
 
 # Initialize Firebase Admin SDK (uncomment if using)
 # cred = credentials.Certificate('firebase-adminsdk.json')
@@ -136,7 +139,7 @@ def check_water_quality_and_notify(data):
 
 # Train Random Forest model
 def train_model():
-    data = list(collection.find().limit(100))
+    data = list(sensor_data_collection.find().limit(100))
     if len(data) < 10:  # Minimum data for training
         logger.warning("Insufficient data for training")
         return None
@@ -157,6 +160,83 @@ model = train_model()
 @app.route('/', methods=['GET'])
 def index():
     return "Welcome to the Water Quality Monitoring API!"
+
+@app.route("/api/register", methods=['POST'])
+def register():
+    try:
+        data = request.get_json()
+        if not data:
+            logger.warning("No JSON data recived")
+            return jsonify({"error": "No data provided"}), 400
+        required_fields = ['username', 'password', 'fcmtoken']
+        if not all(field in data for field in required_fields):
+            missing = [field for field in required_fields if field not in data]
+            logger.warning(f"Missing fields: {missing}")
+            return jsonify({"error": f"Missing fields: {missing}"}), 400
+        username = str(data['username'])
+        password = str(data['password'])
+        fcmtoken = str(data['fcmtoken'])
+
+        #Does user exist
+        user_data = user_data_collection.find({"username": username}).limit(1)
+        user = list(user_data)
+        if (len(user) > 0):
+            return jsonify({"error": "User already exist"}), 400
+        else:
+            user_record = {
+            "username": username,
+            "password": password,
+            "fcmtoken": fcmtoken,
+            "created_at": datetime.utcnow()
+            }
+            # Insert data into MongoDB
+            result = user_data_collection.insert_one(user_record)
+            logger.info(f"Data inserted with ID: {result.inserted_id}")
+            return jsonify({"status": True, "data": {
+                "username": user_record['username'],
+                "fcmtoken": user_record['fcmtoken'],
+                "password": user_record['password']
+            }})
+    except ValueError as ve:
+        logger.error(f"Invalid data format: {ve}")
+        return jsonify({"error": "Invalid data format (values must be numbers)"}), 400
+    except Exception as e:
+        logger.error(f"Error processing request: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+        
+
+@app.route("/api/login", methods=['POST'])
+def login():
+    try:
+        data = request.get_json()
+        if not data:
+            logger.warning("No JSON data recived")
+            return jsonify({"error": "No data provided"}), 400
+        required_fields = ['username', 'password']
+        if not all(field in data for field in required_fields):
+            missing = [field for field in required_fields if field not in data]
+            logger.warning(f"Missing fields: {missing}")
+            return jsonify({"error": f"Missing fields: {missing}"}), 400
+        username = str(data['username'])
+        user_data = list(user_data_collection.find({"username": username}).limit(1))
+        logger.info(len(user_data))
+        if (len(user_data) > 0 ):
+            logger.info(user_data)
+            return jsonify({"data": {
+                "username": user_data[0]['username'],
+                "fcmtoken": user_data[0]['fcmtoken'],
+                "password": user_data[0]['password']
+            }}), 200
+        else:
+            logger.info(f"User not found")
+            return jsonify({"error": "User not found"}), 400
+    except ValueError as ve:
+        logger.error(f"Invalid data format: {ve}")
+        return jsonify({"error": "Invalid data format (values must be numbers)"}), 400
+    except Exception as e:
+        logger.error(f"Error processing request: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+         
 
 # POST endpoint to receive sensor data
 @app.route('/api/sensor_data', methods=['POST'])
@@ -187,15 +267,21 @@ def receive_sensor_data():
         }
 
         # Insert data into MongoDB
-        result = collection.insert_one(sensor_record)
+        result = sensor_data_collection.insert_one(sensor_record)
         logger.info(f"Data inserted with ID: {result.inserted_id}")
 
         # Check water quality and send notifications
         alerts = check_water_quality_and_notify(sensor_record)
+        if (alerts.count > 0):
+            alert_record = {
+            "alerts": alerts,
+            "timestamp": datetime.utcnow(),
+            }
+            result = alert_collection.insert_one(alert_record)
 
         # Retrain model periodically
         global model
-        if model is None or len(list(collection.find())) % 10 == 0:  # Retrain every 10 records
+        if model is None or len(list(sensor_data_collection.find())) % 10 == 0:  # Retrain every 10 records
             model = train_model()
 
         # Predict with Random Forest
@@ -228,7 +314,7 @@ def receive_sensor_data():
 @app.route('/api/sensor_data', methods=['GET'])
 def get_sensor_data():
     try:
-        data = list(collection.find().sort("timestamp", -1).limit(50))
+        data = list(sensor_data_collection.find().sort("timestamp", -1).limit(50))
         for record in data:
             record['_id'] = str(record['_id'])
             record['timestamp'] = record['timestamp'].isoformat()
@@ -242,7 +328,7 @@ def get_sensor_data():
 @app.route('/api/predict', methods=['GET'])
 def predict_water_quality():
     try:
-        latest_data = collection.find().sort("timestamp", -1).limit(1)
+        latest_data = sensor_data_collection.find().sort("timestamp", -1).limit(1)
         latest_data = list(latest_data)[0]
         
         # Check WHO standards and notify
