@@ -3,6 +3,7 @@ from pymongo import MongoClient
 from datetime import datetime
 import logging
 import os
+import json
 from dotenv import load_dotenv
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
@@ -52,9 +53,24 @@ user_data_collection = db['users']
 alert_collection = db['alerts']
 
 
-# Initialize Firebase Admin SDK (uncomment if using)
-# cred = credentials.Certificate('firebase-adminsdk.json')
-# firebase_admin.initialize_app(cred)
+# Initialize Firebase Admin SDK
+# Load service account JSON string from environment variable
+service_account_json = os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY')
+cred = credentials.Certificate({
+    "type": "service_account",
+    "project_id": os.getenv('FIREBASE_PROJECT_ID'),
+    "private_key_id": os.getenv('FIREBASE_PRIVATE_KEY_ID'),
+    "private_key": os.getenv('FIREBASE_PRIVATE_KEY').replace('\\n', '\n'),
+    "client_email": os.getenv('FIREBASE_CLIENT_EMAIL'),
+    "client_id": os.getenv('FIREBASE_CLIENT_ID'),
+    "auth_uri": os.getenv('FIREBASE_AUTH_URI'),
+    "token_uri": os.getenv('FIREBASE_TOKEN_URI'),
+    "auth_provider_x509_cert_url": os.getenv('FIREBASE_AUTH_PROVIDER_CERT_URL'),
+    "client_x509_cert_url": os.getenv('FIREBASE_CLIENT_CERT_URL'),
+    "universe_domain": os.getenv('FIREBASE_UNIVERSE_DOMAIN')
+    # Add any other required fields from the service account JSON
+})
+firebase_admin.initialize_app(cred)
 
 # WHO safe parameter thresholds
 PH_MIN = 6.5
@@ -65,9 +81,11 @@ TDS_MAX = 1000.0     # ppm (WHO guideline for drinking water)
 
 # Send Firebase notification
 def send_firebase_notification(message):
-    fcm_token = os.getenv('FCM_TOKEN')
+    user_data = list(user_data_collection.find().limit(10))
+    fcm_token = user_data[0]['fcmtoken'] if user_data else None
+    logger.info(f"FCM Token: {fcm_token}")
     if not fcm_token:
-        logger.warning("FCM_TOKEN not set in .env")
+        logger.warning("FCM_TOKEN not found")
         return
     notification = messaging.Message(
         notification=messaging.Notification(
@@ -272,7 +290,7 @@ def receive_sensor_data():
 
         # Check water quality and send notifications
         alerts = check_water_quality_and_notify(sensor_record)
-        if (alerts.count > 0):
+        if (len(alerts) > 0):
             alert_record = {
             "alerts": alerts,
             "timestamp": datetime.utcnow(),
