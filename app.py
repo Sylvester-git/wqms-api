@@ -227,30 +227,33 @@ def login():
         if not data:
             logger.warning("No JSON data recived")
             return jsonify({"error": "No data provided"}), 400
-        required_fields = ['username', 'password']
+        required_fields = ['fcmtoken']
         if not all(field in data for field in required_fields):
             missing = [field for field in required_fields if field not in data]
             logger.warning(f"Missing fields: {missing}")
             return jsonify({"error": f"Missing fields: {missing}"}), 400
-        username = str(data['username'])
-        user_data = list(user_data_collection.find({"username": username}).limit(1))
-        logger.info(len(user_data))
-        if (len(user_data) > 0 ):
-            logger.info(user_data)
-            return jsonify({"data": {
-                "username": user_data[0]['username'],
-                "fcmtoken": user_data[0]['fcmtoken'],
-                "password": user_data[0]['password']
-            }}), 200
-        else:
-            logger.info(f"User not found")
+        
+        fcm_token = str(data['fcmtoken'])
+        filter_criteria = {"username": "David"}
+        update_data = {"$set": {"fcmtoken": fcm_token}}
+        user_data_collection.update_one(filter_criteria,update_data)
+        result = user_data_collection.find({"username": "David"})
+        user = list(result)
+        logger.info(f"FCM token updated successfully for user: {filter_criteria['username']}")
+        if (len(user) == 0):
             return jsonify({"error": "User not found"}), 400
+        else:
+            return jsonify({"status": True,"message":"FCM token successfully changed", "data": {
+                "username": user[0]['username'],
+                "fcmtoken": user[0]['fcmtoken'],
+                "password": user[0]['password']
+            }}), 200
     except ValueError as ve:
         logger.error(f"Invalid data format: {ve}")
-        return jsonify({"error": "Invalid data format (values must be numbers)"}), 400
+        return jsonify({"status": False,"error": "Invalid data format (values must be numbers)"}), 400
     except Exception as e:
         logger.error(f"Error processing request: {e}")
-        return jsonify({"error": "Internal server error"}), 500
+        return jsonify({"status": False,"error": e}), 400
          
 
 # POST endpoint to receive sensor data
