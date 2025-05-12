@@ -25,9 +25,8 @@ A Flask-based REST API for real-time water quality monitoring, alerting, and pre
 
 2. **Configure environment variables** in a `.env` file:
 
-    ``` bash
+    ```
     MONGO_URI=your_mongodb_uri
-    FIREBASE_SERVICE_ACCOUNT_KEY=your_firebase_service_account_json
     FIREBASE_PROJECT_ID=...
     FIREBASE_PRIVATE_KEY_ID=...
     FIREBASE_PRIVATE_KEY=...

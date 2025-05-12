@@ -3,7 +3,6 @@ from pymongo import MongoClient
 from datetime import datetime
 import logging
 import os
-import json
 from dotenv import load_dotenv
 from sklearn.ensemble import RandomForestClassifier
 import pandas as pd
@@ -54,8 +53,6 @@ alert_collection = db['alerts']
 
 
 # Initialize Firebase Admin SDK
-# Load service account JSON string from environment variable
-service_account_json = os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY')
 cred = credentials.Certificate({
     "type": "service_account",
     "project_id": os.getenv('FIREBASE_PROJECT_ID'),
