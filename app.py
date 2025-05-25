@@ -342,6 +342,19 @@ def get_sensor_data():
     except Exception as e:
         logger.error(f"Error retrieving data: {e}")
         return jsonify({"error": "Internal server error"}), 500
+    
+@app.route('/api/alerts', methods=['GET'])
+def get_alerts():
+    try:
+        data = list(alert_collection.find().sort("timestamp", -1).limit(100))
+        for record in data:
+            record['_id'] = str(record['_id'])
+            record['timestamp'] = record['timestamp'].isoformat()
+        logger.info("Retrieved alerts successfully")
+        return jsonify(data), 200
+    except Exception as e:
+        logger.error(f"Error retrieving data: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 # GET endpoint for ML prediction and water quality status
 @app.route('/api/predict', methods=['GET'])
