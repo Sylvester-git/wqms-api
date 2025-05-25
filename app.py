@@ -97,24 +97,24 @@ def send_firebase_notification(message):
     except Exception as e:
         logger.error(f"Failed to send Firebase notification: {e}")
 
-# Send Slack notification
-def send_slack_notification(message):
-    slack_webhook_url = os.getenv('SLACK_WEBHOOK_URL')
-    if not slack_webhook_url:
-        logger.warning("SLACK_WEBHOOK_URL not set in .env")
-        return
-    payload = {
-        "text": f"Water Quality Alert: {message}"
-    }
-    try:
-        response = requests.post(slack_webhook_url, json=payload)
-        response.raise_for_status()
-        logger.info("Slack notification sent successfully")
-    except requests.RequestException as e:
-        logger.error(f"Failed to send Slack notification: {e}")
+# # Send Slack notification
+# def send_slack_notification(message):
+#     slack_webhook_url = os.getenv('SLACK_WEBHOOK_URL')
+#     if not slack_webhook_url:
+#         logger.warning("SLACK_WEBHOOK_URL not set in .env")
+#         return
+#     payload = {
+#         "text": f"Water Quality Alert: {message}"
+#     }
+#     try:
+#         response = requests.post(slack_webhook_url, json=payload)
+#         response.raise_for_status()
+#         logger.info("Slack notification sent successfully")
+#     except requests.RequestException as e:
+#         logger.error(f"Failed to send Slack notification: {e}")
 
 # Check water quality against WHO standards and send notifications
-def check_water_quality_and_notify(data):
+def check_water_quality_and_notify(data,notify=True):
     pH = data['pH']
     turbidity = data['turbidity']
     temp = data['temp']
@@ -124,31 +124,32 @@ def check_water_quality_and_notify(data):
     if pH < PH_MIN:
         alert = f"Low pH detected: {pH} (below {PH_MIN})"
         alerts.append(alert)
-        send_firebase_notification(alert)
-        send_slack_notification(alert)
+        if (notify):
+            send_firebase_notification(alert)
+
     elif pH > PH_MAX:
         alert = f"High pH detected: {pH} (above {PH_MAX})"
         alerts.append(alert)
-        send_firebase_notification(alert)
-        send_slack_notification(alert)
+        if (notify):
+            send_firebase_notification(alert)
     
     if turbidity > TURBIDITY_MAX:
         alert = f"High turbidity detected: {turbidity} NTU (above {TURBIDITY_MAX} NTU)"
         alerts.append(alert)
-        send_firebase_notification(alert)
-        send_slack_notification(alert)
+        if (notify):
+            send_firebase_notification(alert)
     
     if temp > TEMP_MAX:
         alert = f"High temperature detected: {temp}°C (above {TEMP_MAX}°C)"
         alerts.append(alert)
-        send_firebase_notification(alert)
-        send_slack_notification(alert)
+        if (notify):
+            send_firebase_notification(alert)
     
     if tds > TDS_MAX:
         alert = f"High TDS detected: {tds} ppm (above {TDS_MAX} ppm)"
         alerts.append(alert)
-        send_firebase_notification(alert)
-        send_slack_notification(alert)
+        if (notify):
+            send_firebase_notification(alert)
 
     return alerts
 
@@ -350,7 +351,7 @@ def predict_water_quality():
         latest_data = list(latest_data)[0]
         
         # Check WHO standards and notify
-        alerts = check_water_quality_and_notify(latest_data)
+        alerts = check_water_quality_and_notify(latest_data, notify=False)
 
         # ML prediction
         if model is None:
