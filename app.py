@@ -18,7 +18,7 @@ app = Flask(__name__)
 # Enable CORS
 CORS(app, resources={
     r"/api/*": {
-        "origins": ["https://wqms-api.onrender.com"],
+        "origins": ["*"],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
         "allow_headers": ["Content-Type", "Accept", "language"]
     }
