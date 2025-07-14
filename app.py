@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from pymongo import MongoClient
+from flask_cors import CORS
 from datetime import datetime
 import logging
 import os
@@ -14,7 +15,14 @@ import atexit
 
 # Initialize Flask app
 app = Flask(__name__)
-
+# Enable CORS
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["https://wqms-api.onrender.com"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Accept", "language"]
+    }
+})
 # Load environment variables
 load_dotenv()
 
@@ -96,22 +104,6 @@ def send_firebase_notification(message):
         logger.info(f"Firebase notification sent: {response}")
     except Exception as e:
         logger.error(f"Failed to send Firebase notification: {e}")
-
-# # Send Slack notification
-# def send_slack_notification(message):
-#     slack_webhook_url = os.getenv('SLACK_WEBHOOK_URL')
-#     if not slack_webhook_url:
-#         logger.warning("SLACK_WEBHOOK_URL not set in .env")
-#         return
-#     payload = {
-#         "text": f"Water Quality Alert: {message}"
-#     }
-#     try:
-#         response = requests.post(slack_webhook_url, json=payload)
-#         response.raise_for_status()
-#         logger.info("Slack notification sent successfully")
-#     except requests.RequestException as e:
-#         logger.error(f"Failed to send Slack notification: {e}")
 
 # Check water quality against WHO standards and send notifications
 def check_water_quality_and_notify(data,notify=True):
